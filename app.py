@@ -60,9 +60,9 @@ def submit():
     st.session_state.query = ''
 
 
-st.title("🍕 Papa Johns Pizza Assistant 🍕")
+st.title(" Asistente de Mantenimiento")
 
-st.text_input("Play with me:", key='query', on_change=submit)
+st.text_input("Te puedo ayudar con ubicaciones físicas de recintos, Equipos y Ordenes:", key='query', on_change=submit)
 
 user_input = st.session_state.user_input
 
@@ -70,6 +70,6 @@ st.write("You entered: ", user_input)
 
 if user_input:
     result = get_assistant_response(user_input)
-    st.header('Assistant :blue[cool] :pizza:', divider='rainbow')
+    st.header('Asistente :blue[buena onda] :pizza:', divider='rainbow')
     st.text(result)
 

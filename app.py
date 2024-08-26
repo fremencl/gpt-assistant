@@ -60,9 +60,9 @@ def submit():
     st.session_state.query = ''
 
 
-st.title(" Asistente de Mantenimiento 🔧")
+st.title(" Asistente Gerencia Gestion de Activos 🔧")
 
-st.text_input("Te puedo ayudar con ubicaciones físicas de recintos, Equipos y Ordenes:", key='query', on_change=submit)
+st.text_input("Puedo ayudarte en algo hoy:", key='query', on_change=submit)
 
 user_input = st.session_state.user_input
 

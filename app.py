@@ -62,7 +62,7 @@ def submit():
 
 st.title(" Asistente Gerencia Gestion de Activos 🔧")
 
-st.text_input("Puedo ayudarte en algo hoy:", key='query', on_change=submit)
+st.text_input("Puedo ayudarte en algo hoy?", key='query', on_change=submit)
 
 user_input = st.session_state.user_input
 

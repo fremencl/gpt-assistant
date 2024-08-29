@@ -14,7 +14,7 @@ def load_openai_client_and_assistant():
     my_assistant    = client.beta.assistants.retrieve(assistant_id)
     thread          = client.beta.threads.create()
 
-    return client , my_assistant, thread
+    return client, my_assistant, thread
 
 client,  my_assistant, assistant_thread = load_openai_client_and_assistant()
 
@@ -72,8 +72,22 @@ if user_input:
     result = get_assistant_response(user_input)
     st.header('Assistant 🛠️', divider='rainbow')
 
-    # Detectar si el resultado contiene un enlace a Google Maps
+    # Detectar si el resultado contiene un enlace
     if "http" in result:
-        st.markdown(f"[Click here to view the location on Google Maps]({result})")
+        # Separar las palabras para analizar si alguna es un enlace
+        words = result.split()
+        for word in words:
+            if word.startswith("http"):
+                # Identificar si es un enlace a Google Maps, archivo CSV o imagen JPG
+                if "google.com/maps" in word:
+                    st.markdown(f"[Click here to view the location on Google Maps]({word})")
+                elif word.endswith(".csv"):
+                    st.markdown(f"[Download CSV]({word})")
+                elif word.endswith(".jpg") or word.endswith(".jpeg"):
+                    st.markdown(f"[Download Image]({word})")
+                else:
+                    st.markdown(f"[Visit Link]({word})")
+            else:
+                st.text(word)
     else:
         st.text(result)

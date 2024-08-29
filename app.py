@@ -2,6 +2,7 @@
 import streamlit as st
 import time
 from openai import OpenAI
+import re
 
 # Set your OpenAI API key and assistant ID here
 api_key         = st.secrets["openai_apikey"]
@@ -72,22 +73,21 @@ if user_input:
     result = get_assistant_response(user_input)
     st.header('Assistant 🛠️', divider='rainbow')
 
-    # Detectar si el resultado contiene un enlace
-    if "http" in result:
-        # Separar las palabras para analizar si alguna es un enlace
-        words = result.split()
-        for word in words:
-            if word.startswith("http"):
-                # Identificar si es un enlace a Google Maps, archivo CSV o imagen JPG
-                if "google.com/maps" in word:
-                    st.markdown(f"[Click here to view the location on Google Maps]({word})")
-                elif word.endswith(".csv"):
-                    st.markdown(f"[Download CSV]({word})")
-                elif word.endswith(".jpg") or word.endswith(".jpeg"):
-                    st.markdown(f"[Download Image]({word})")
-                else:
-                    st.markdown(f"[Visit Link]({word})")
+    # Buscamos enlaces en el texto
+    links = re.findall(r'(https?://\S+)', result)
+
+    # Si se encuentran enlaces, los procesamos
+    if links:
+        for link in links:
+            # Verificamos si es un enlace de Google Maps
+            if "google.com/maps" in link:
+                result = result.replace(link, f"[Click here to view the location on Google Maps]({link})")
+            elif link.endswith(".csv"):
+                result = result.replace(link, f"[Download CSV]({link})")
+            elif link.endswith(".jpg") or link.endswith(".jpeg"):
+                result = result.replace(link, f"[Download Image]({link})")
             else:
-                st.text(word)
-    else:
-        st.text(result)
+                result = result.replace(link, f"[Visit Link]({link})")
+
+    # Mostramos el resultado final con los enlaces procesados
+    st.markdown(result)

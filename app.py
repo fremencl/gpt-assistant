@@ -70,5 +70,10 @@ st.write("You entered: ", user_input)
 
 if user_input:
     result = get_assistant_response(user_input)
-    st.header('Asistente :blue[Mantenimiento] 🛠️', divider='rainbow')
-    st.text(result)
+    st.header('Assistant 🛠️', divider='rainbow')
+
+    # Detectar si el resultado contiene un enlace a Google Maps
+    if "http" in result:
+        st.markdown(f"[Click here to view the location on Google Maps]({result})")
+    else:
+        st.text(result)

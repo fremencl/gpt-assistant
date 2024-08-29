@@ -2,6 +2,8 @@ import streamlit as st
 import time
 from openai import OpenAI
 import re
+import io
+import pandas as pd
 import requests
 
 # Set your OpenAI API key and assistant ID here
@@ -49,10 +51,10 @@ def get_assistant_response(user_input=""):
         thread_id=assistant_thread.id, order="asc", after=message.id
     )
 
-    return messages.data[0].content[0].text.value
+    return messages.data[0].content[0].text.value, messages.data[0].file_ids
 
-# Retrieve file from OpenAI storage
-def retrieve_file(file_id, api_key):
+# Retrieve file content from OpenAI storage
+def retrieve_file_content(file_id, api_key):
     url = f"https://api.openai.com/v1/files/{file_id}/content"
     headers = {
         "Authorization": f"Bearer {api_key}"
@@ -82,36 +84,26 @@ user_input = st.session_state.user_input
 st.write("You entered: ", user_input)
 
 if user_input:
-    result = get_assistant_response(user_input)
+    result, file_ids = get_assistant_response(user_input)
     st.header('Assistant 🛠️', divider='rainbow')
 
-    # Check if the result contains a file_id
-    file_id_pattern = r'file-\w+'
-    match = re.search(file_id_pattern, result)
-    if match:
-        file_id = match.group(0)
+    if file_ids:
+        file_id = file_ids[0]  # Usamos el primer file_id que retorna el asistente
         st.write(f"File ID found: {file_id}")
 
         # Retrieve the file content
-        file_content = retrieve_file(file_id, api_key)
+        file_content = retrieve_file_content(file_id, api_key)
         if file_content:
+            # Create a file-like object and read it into a DataFrame
+            file_like_object = io.BytesIO(file_content)
+            df = pd.read_csv(file_like_object)
+            st.write(df)  # Muestra el DataFrame en Streamlit
+
             st.download_button(
                 label="Download File",
                 data=file_content,
-                file_name="downloaded_file.csv",  # Adjust the file name and extension as needed
-                mime="text/csv"  # Adjust the MIME type based on the file type
+                file_name="downloaded_file.csv",  # Ajusta el nombre y extensión según sea necesario
+                mime="text/csv"  # Ajusta el MIME type basado en el tipo de archivo
             )
     else:
-        # Process other links in the result
-        links = re.findall(r'(https?://\S+)', result)
-        if links:
-            for link in links:
-                if "google.com/maps" in link:
-                    result = result.replace(link, f"[Click here to view the location on Google Maps]({link})")
-                elif link.endswith(".csv"):
-                    result = result.replace(link, f"[Download CSV]({link})")
-                elif link.endswith(".jpg") or link.endswith(".jpeg"):
-                    result = result.replace(link, f"[Download Image]({link})")
-                else:
-                    result = result.replace(link, f"[Visit Link]({link})")
-        st.markdown(result)
+        st.write("No file generated or returned by the assistant.")

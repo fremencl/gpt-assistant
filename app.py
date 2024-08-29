@@ -1,4 +1,3 @@
-# Importing required packages
 import streamlit as st
 import time
 import base64
@@ -53,16 +52,26 @@ def get_assistant_response(user_input=""):
     response = messages.data[0].content[0]
     
     # Verificar si la respuesta es una imagen o texto
-    if hasattr(response, 'image_data'):  # Asegúrate de que 'image_data' sea el campo correcto
+    if hasattr(response, 'image_data'):
         return {
             'type': 'image',
-            'content': response.image_data,  # Decodifica si es necesario
+            'content': response.image_data,  # Asegúrate de usar el campo correcto aquí
+        }
+    elif hasattr(response, 'csv_data'):
+        return {
+            'type': 'csv',
+            'content': response.csv_data,  # Asegúrate de usar el campo correcto aquí
         }
     else:
         return {
             'type': 'text',
             'content': response.text.value,
         }
+
+def generate_download_link(data, filename, filetype):
+    b64 = base64.b64encode(data).decode()  # Codificar los datos en base64
+    href = f'<a href="data:file/{filetype};base64,{b64}" download="{filename}">Descargar {filename}</a>'
+    return href
 
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ''
@@ -90,3 +99,13 @@ if user_input:
         # Decodificar la imagen desde base64
         image_data = base64.b64decode(result['content'])
         st.image(image_data, use_column_width=True)
+        
+        # Crear un enlace de descarga
+        st.markdown(generate_download_link(image_data, "grafico.jpg", "jpg"), unsafe_allow_html=True)
+    
+    elif result['type'] == 'csv':
+        # Decodificar el CSV desde base64
+        csv_data = base64.b64decode(result['content'])
+        
+        # Crear un enlace de descarga
+        st.markdown(generate_download_link(csv_data, "detalle_equipos.csv", "csv"), unsafe_allow_html=True)

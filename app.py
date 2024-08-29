@@ -1,24 +1,24 @@
+# Importing required packages
 import streamlit as st
 import time
-import re
 from openai import OpenAI
 
 # Set your OpenAI API key and assistant ID here
-api_key = st.secrets["openai_apikey"]
-assistant_id = st.secrets["assistant_id"]
+api_key         = st.secrets["openai_apikey"]
+assistant_id    = st.secrets["assistant_id"]
 
 # Set openAi client , assistant ai and assistant ai thread
 @st.cache_resource
 def load_openai_client_and_assistant():
-    client = OpenAI(api_key=api_key)
-    my_assistant = client.beta.assistants.retrieve(assistant_id)
-    thread = client.beta.threads.create()
+    client          = OpenAI(api_key=api_key)
+    my_assistant    = client.beta.assistants.retrieve(assistant_id)
+    thread          = client.beta.threads.create()
 
-    return client, my_assistant, thread
+    return client , my_assistant, thread
 
-client, my_assistant, assistant_thread = load_openai_client_and_assistant()
+client,  my_assistant, assistant_thread = load_openai_client_and_assistant()
 
-# Check in loop if assistant ai parse our request
+# check in loop  if assistant ai parse our request
 def wait_on_run(run, thread):
     while run.status == "queued" or run.status == "in_progress":
         run = client.beta.threads.runs.retrieve(
@@ -28,13 +28,7 @@ def wait_on_run(run, thread):
         time.sleep(0.5)
     return run
 
-# Function to identify URLs in the response text and convert them to clickable links
-def format_links(text):
-    url_pattern = r"(https?://\S+)"
-    formatted_text = re.sub(url_pattern, r'<a href="\1" target="_blank">\1</a>', text)
-    return formatted_text
-
-# Initiate assistant ai response
+# initiate assistant ai response
 def get_assistant_response(user_input=""):
 
     message = client.beta.threads.messages.create(
@@ -55,12 +49,8 @@ def get_assistant_response(user_input=""):
         thread_id=assistant_thread.id, order="asc", after=message.id
     )
 
-    response_text = messages.data[0].content[0].text.value
+    return messages.data[0].content[0].text.value
 
-    # Format the response to include clickable links
-    formatted_response = format_links(response_text)
-
-    return formatted_response
 
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ''
@@ -68,6 +58,7 @@ if 'user_input' not in st.session_state:
 def submit():
     st.session_state.user_input = st.session_state.query
     st.session_state.query = ''
+
 
 st.title(" Asistente Gerencia Gestion de Activos 🔧")
 
@@ -80,6 +71,4 @@ st.write("You entered: ", user_input)
 if user_input:
     result = get_assistant_response(user_input)
     st.header('Asistente :blue[Mantenimiento] 🛠️', divider='rainbow')
-
-    # Display the formatted response as markdown to render links
-    st.markdown(result, unsafe_allow_html=True)
+    st.text(result)

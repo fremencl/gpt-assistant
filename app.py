@@ -1,10 +1,8 @@
 import streamlit as st
-import requests
-import io
-import pandas as pd
-
-# Simulating OpenAI client setup
+import time
 from openai import OpenAI
+import re
+import requests
 
 # Set your OpenAI API key and assistant ID here
 api_key = st.secrets["openai_apikey"]
@@ -21,65 +19,99 @@ def load_openai_client_and_assistant():
 
 client, my_assistant, assistant_thread = load_openai_client_and_assistant()
 
-# Function to get response from thread
-def get_response(thread):
-    return client.beta.threads.messages.list(thread_id=thread.id)
+# Check in loop if assistant AI processes our request
+def wait_on_run(run, thread):
+    while run.status == "queued" or run.status == "in_progress":
+        run = client.beta.threads.runs.retrieve(
+            thread_id=thread.id,
+            run_id=run.id,
+        )
+        time.sleep(0.5)
+    return run
 
-# Function to extract file_ids from the thread
-def get_file_ids_from_thread(thread):
-    response = get_response(thread)
-    file_ids = [
-        file_id
-        for m in response.data
-        for file_id in m.file_ids
-    ]
-    return file_ids
+# Initiate assistant AI response
+def get_assistant_response(user_input=""):
+    message = client.beta.threads.messages.create(
+        thread_id=assistant_thread.id,
+        role="user",
+        content=user_input,
+    )
 
-# Function to write file to a temporary directory
-def write_file_to_temp_dir(file_id, output_path):
+    run = client.beta.threads.runs.create(
+        thread_id=assistant_thread.id,
+        assistant_id=assistant_id,
+    )
+
+    run = wait_on_run(run, assistant_thread)
+
+    # Retrieve all the messages added after our last user message
+    messages = client.beta.threads.messages.list(
+        thread_id=assistant_thread.id, order="asc", after=message.id
+    )
+
+    return messages.data[0].content[0].text.value
+
+# Retrieve file from OpenAI storage
+def retrieve_file(file_id, api_key):
     url = f"https://api.openai.com/v1/files/{file_id}/content"
     headers = {
         "Authorization": f"Bearer {api_key}"
     }
     response = requests.get(url, headers=headers)
     
+    # Check if the request was successful
     if response.status_code == 200:
-        with open(output_path, "wb") as file:
-            file.write(response.content)
-        return output_path
+        return response.content
     else:
-        st.error("Failed to retrieve the file from OpenAI.")
+        st.error("Failed to retrieve the file.")
         return None
 
-# Function to process file and prepare for download
-def process_file_and_prepare_download(thread):
-    file_ids = get_file_ids_from_thread(thread)
-    if file_ids:
-        some_file_id = file_ids[0]  # Use the first file_id found in the thread
-        output_path = "/tmp/some_data.csv"  # Temporary path to save the file
-        saved_file_path = write_file_to_temp_dir(some_file_id, output_path)
-        
-        if saved_file_path:
-            with open(saved_file_path, "rb") as file:
-                st.download_button(
-                    label="Download CSV",
-                    data=file,
-                    file_name="some_data.csv",
-                    mime="text/csv"
-                )
-        else:
-            st.error("Error saving the file.")
-    else:
-        st.write("No file_id found in the thread.")
+if 'user_input' not in st.session_state:
+    st.session_state.user_input = ''
 
-# Example usage in Streamlit
+def submit():
+    st.session_state.user_input = st.session_state.query
+    st.session_state.query = ''
+
 st.title("Asistente Gerencia Gestion de Activos 🔧")
 
-user_input = st.text_input("Puedo ayudarte en algo hoy?")
+st.text_input("Puedo ayudarte en algo hoy?", key='query', on_change=submit)
+
+user_input = st.session_state.user_input
+
+st.write("You entered: ", user_input)
 
 if user_input:
-    # Simulate assistant processing and saving a file (in reality, this will be your assistant's logic)
-    # For this example, assume the assistant has already processed the data and created a thread with a file
+    result = get_assistant_response(user_input)
+    st.header('Assistant 🛠️', divider='rainbow')
 
-    # Use the process_file_and_prepare_download function to handle the file download
-    process_file_and_prepare_download(assistant_thread)
+    # Check if the result contains a file_id
+    file_id_pattern = r'file-\w+'
+    match = re.search(file_id_pattern, result)
+    if match:
+        file_id = match.group(0)
+        st.write(f"File ID found: {file_id}")
+
+        # Retrieve the file content
+        file_content = retrieve_file(file_id, api_key)
+        if file_content:
+            st.download_button(
+                label="Download File",
+                data=file_content,
+                file_name="downloaded_file.csv",  # Adjust the file name and extension as needed
+                mime="text/csv"  # Adjust the MIME type based on the file type
+            )
+    else:
+        # Process other links in the result
+        links = re.findall(r'(https?://\S+)', result)
+        if links:
+            for link in links:
+                if "google.com/maps" in link:
+                    result = result.replace(link, f"[Click here to view the location on Google Maps]({link})")
+                elif link.endswith(".csv"):
+                    result = result.replace(link, f"[Download CSV]({link})")
+                elif link.endswith(".jpg") or link.endswith(".jpeg"):
+                    result = result.replace(link, f"[Download Image]({link})")
+                else:
+                    result = result.replace(link, f"[Visit Link]({link})")
+        st.markdown(result)

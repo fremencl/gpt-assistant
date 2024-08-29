@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-import base64
+import re
 from openai import OpenAI
 
 # Set your OpenAI API key and assistant ID here
@@ -18,7 +18,7 @@ def load_openai_client_and_assistant():
 
 client, my_assistant, assistant_thread = load_openai_client_and_assistant()
 
-# check in loop  if assistant ai parse our request
+# Check in loop if assistant ai parse our request
 def wait_on_run(run, thread):
     while run.status == "queued" or run.status == "in_progress":
         run = client.beta.threads.runs.retrieve(
@@ -28,7 +28,13 @@ def wait_on_run(run, thread):
         time.sleep(0.5)
     return run
 
-# initiate assistant ai response
+# Function to identify URLs in the response text and convert them to clickable links
+def format_links(text):
+    url_pattern = r"(https?://\S+)"
+    formatted_text = re.sub(url_pattern, r'<a href="\1" target="_blank">\1</a>', text)
+    return formatted_text
+
+# Initiate assistant ai response
 def get_assistant_response(user_input=""):
 
     message = client.beta.threads.messages.create(
@@ -49,29 +55,12 @@ def get_assistant_response(user_input=""):
         thread_id=assistant_thread.id, order="asc", after=message.id
     )
 
-    response = messages.data[0].content[0]
-    
-    # Verificar si la respuesta es una imagen o texto
-    if hasattr(response, 'image_data'):
-        return {
-            'type': 'image',
-            'content': response.image_data,  # Asegúrate de usar el campo correcto aquí
-        }
-    elif hasattr(response, 'csv_data'):
-        return {
-            'type': 'csv',
-            'content': response.csv_data,  # Asegúrate de usar el campo correcto aquí
-        }
-    else:
-        return {
-            'type': 'text',
-            'content': response.text.value,
-        }
+    response_text = messages.data[0].content[0].text.value
 
-def generate_download_link(data, filename, filetype):
-    b64 = base64.b64encode(data).decode()  # Codificar los datos en base64
-    href = f'<a href="data:file/{filetype};base64,{b64}" download="{filename}">Descargar {filename}</a>'
-    return href
+    # Format the response to include clickable links
+    formatted_response = format_links(response_text)
+
+    return formatted_response
 
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ''
@@ -79,7 +68,6 @@ if 'user_input' not in st.session_state:
 def submit():
     st.session_state.user_input = st.session_state.query
     st.session_state.query = ''
-
 
 st.title(" Asistente Gerencia Gestion de Activos 🔧")
 
@@ -93,19 +81,5 @@ if user_input:
     result = get_assistant_response(user_input)
     st.header('Asistente :blue[Mantenimiento] 🛠️', divider='rainbow')
 
-    if result['type'] == 'text':
-        st.text(result['content'])
-    elif result['type'] == 'image':
-        # Decodificar la imagen desde base64
-        image_data = base64.b64decode(result['content'])
-        st.image(image_data, use_column_width=True)
-        
-        # Crear un enlace de descarga
-        st.markdown(generate_download_link(image_data, "grafico.jpg", "jpg"), unsafe_allow_html=True)
-    
-    elif result['type'] == 'csv':
-        # Decodificar el CSV desde base64
-        csv_data = base64.b64decode(result['content'])
-        
-        # Crear un enlace de descarga
-        st.markdown(generate_download_link(csv_data, "detalle_equipos.csv", "csv"), unsafe_allow_html=True)
+    # Display the formatted response as markdown to render links
+    st.markdown(result, unsafe_allow_html=True)

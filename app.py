@@ -1,22 +1,23 @@
 # Importing required packages
 import streamlit as st
 import time
+import base64
 from openai import OpenAI
 
 # Set your OpenAI API key and assistant ID here
-api_key         = st.secrets["openai_apikey"]
-assistant_id    = st.secrets["assistant_id"]
+api_key = st.secrets["openai_apikey"]
+assistant_id = st.secrets["assistant_id"]
 
 # Set openAi client , assistant ai and assistant ai thread
 @st.cache_resource
 def load_openai_client_and_assistant():
-    client          = OpenAI(api_key=api_key)
-    my_assistant    = client.beta.assistants.retrieve(assistant_id)
-    thread          = client.beta.threads.create()
+    client = OpenAI(api_key=api_key)
+    my_assistant = client.beta.assistants.retrieve(assistant_id)
+    thread = client.beta.threads.create()
 
-    return client , my_assistant, thread
+    return client, my_assistant, thread
 
-client,  my_assistant, assistant_thread = load_openai_client_and_assistant()
+client, my_assistant, assistant_thread = load_openai_client_and_assistant()
 
 # check in loop  if assistant ai parse our request
 def wait_on_run(run, thread):
@@ -49,8 +50,19 @@ def get_assistant_response(user_input=""):
         thread_id=assistant_thread.id, order="asc", after=message.id
     )
 
-    return messages.data[0].content[0].text.value
-
+    response = messages.data[0].content[0]
+    
+    # Verificar si la respuesta es una imagen o texto
+    if hasattr(response, 'image_data'):  # Asegúrate de que 'image_data' sea el campo correcto
+        return {
+            'type': 'image',
+            'content': response.image_data,  # Decodifica si es necesario
+        }
+    else:
+        return {
+            'type': 'text',
+            'content': response.text.value,
+        }
 
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ''
@@ -71,4 +83,10 @@ st.write("You entered: ", user_input)
 if user_input:
     result = get_assistant_response(user_input)
     st.header('Asistente :blue[Mantenimiento] 🛠️', divider='rainbow')
-    st.text(result)
+
+    if result['type'] == 'text':
+        st.text(result['content'])
+    elif result['type'] == 'image':
+        # Decodificar la imagen desde base64
+        image_data = base64.b64decode(result['content'])
+        st.image(image_data, use_column_width=True)

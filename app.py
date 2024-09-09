@@ -2,7 +2,6 @@ import streamlit as st
 import time
 from openai import OpenAI
 import re
-import requests
 
 # Set your OpenAI API key and assistant ID here
 api_key = st.secrets["openai_apikey"]
@@ -51,21 +50,6 @@ def get_assistant_response(user_input=""):
 
     return messages.data[0].content[0].text.value
 
-# Retrieve file from OpenAI storage
-def retrieve_file(file_id, api_key):
-    url = f"https://api.openai.com/v1/files/{file_id}/content"
-    headers = {
-        "Authorization": f"Bearer {api_key}"
-    }
-    response = requests.get(url, headers=headers)
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        return response.content
-    else:
-        st.error("Failed to retrieve the file.")
-        return None
-
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ''
 
@@ -85,33 +69,13 @@ if user_input:
     result = get_assistant_response(user_input)
     st.header('Assistant 🛠️', divider='rainbow')
 
-    # Check if the result contains a file_id
-    file_id_pattern = r'file-\w+'
-    match = re.search(file_id_pattern, result)
-    if match:
-        file_id = match.group(0)
-        st.write(f"File ID found: {file_id}")
+    # Process links in the result
+    links = re.findall(r'(https?://\S+)', result)
+    if links:
+        for link in links:
+            if "google.com/maps" in link:
+                result = result.replace(link, f"[Click here to view the location on Google Maps]({link})")
+            else:
+                result = result.replace(link, f"[Visit Link]({link})")
 
-        # Retrieve the file content
-        file_content = retrieve_file(file_id, api_key)
-        if file_content:
-            st.download_button(
-                label="Download File",
-                data=file_content,
-                file_name="downloaded_file.csv",  # Adjust the file name and extension as needed
-                mime="text/csv"  # Adjust the MIME type based on the file type
-            )
-    else:
-        # Process other links in the result
-        links = re.findall(r'(https?://\S+)', result)
-        if links:
-            for link in links:
-                if "google.com/maps" in link:
-                    result = result.replace(link, f"[Click here to view the location on Google Maps]({link})")
-                elif link.endswith(".csv"):
-                    result = result.replace(link, f"[Download CSV]({link})")
-                elif link.endswith(".jpg") or link.endswith(".jpeg"):
-                    result = result.replace(link, f"[Download Image]({link})")
-                else:
-                    result = result.replace(link, f"[Visit Link]({link})")
-        st.markdown(result)
+    st.markdown(result)
